@@ -115,8 +115,6 @@ window.addEventListener('DOMContentLoaded', function () {
             voiture.checkCollisions = true;
         });
 
-        platforms.push(voiture);
-
         scene.onBeforeRenderObservable.add(() => {
             if (!bonhomme) return;
 
