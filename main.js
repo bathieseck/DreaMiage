@@ -2,7 +2,7 @@ window.addEventListener('DOMContentLoaded', function () {
     const canvas = document.getElementById('renderCanvas');
     const engine = new BABYLON.Engine(canvas, true);
 
-    let bonhomme; // Personnage contrôlé
+    let bonhomme;
 
     const createScene = function () {
         const scene = new BABYLON.Scene(engine);
@@ -12,6 +12,17 @@ window.addEventListener('DOMContentLoaded', function () {
         scene.clearColor = new BABYLON.Color4(0.6, 0.4, 0.9, 1);
 
         const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+        const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, scene);
+        const skyboxMaterial = new BABYLON.StandardMaterial("skyBoxMaterial", scene);
+        skyboxMaterial.backFaceCulling = false;
+        skyboxMaterial.disableLighting = true;
+        skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+        skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+        skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("https://playground.babylonjs.com/textures/skybox", scene);
+        skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+        skybox.material = skyboxMaterial;
+        skybox.infiniteDistance = true;
 
         const ground = BABYLON.MeshBuilder.CreateDisc("ground", {
             radius: 30,
@@ -39,13 +50,12 @@ window.addEventListener('DOMContentLoaded', function () {
         ];
 
         platformPositions.forEach((pos, i) => {
-            const plat = BABYLON.MeshBuilder.CreateDisc(`platform${i}`, {
-                radius: 6,
-                tessellation: 64,
-                sideOrientation: BABYLON.Mesh.DOUBLESIDE
+            const plat = BABYLON.MeshBuilder.CreateCylinder(`platform${i}`, {
+                diameter: 12, // équivalent à radius * 2
+                height: 1 // épaisseur de la plateforme
             }, scene);
-            plat.rotation.x = Math.PI / 2;
-            plat.position = pos;
+            plat.rotation.x = 0; // pas besoin de rotation ici
+            plat.position = new BABYLON.Vector3(pos.x, pos.y - 0.5, pos.z); // ajuste la position pour que le haut soit au bon y
             plat.checkCollisions = true;
 
             const mat = new BABYLON.StandardMaterial(`platMat${i}`, scene);
@@ -54,6 +64,7 @@ window.addEventListener('DOMContentLoaded', function () {
 
             platforms.push(plat);
         });
+
 
         const body = BABYLON.MeshBuilder.CreateCylinder("body", { diameter: 1, height: 2 }, scene);
         body.position.y = 1;
@@ -70,10 +81,17 @@ window.addEventListener('DOMContentLoaded', function () {
         rightLeg.position.x = 0.4;
 
         bonhomme = BABYLON.Mesh.MergeMeshes([body, head, leftArm, rightArm, leftLeg, rightLeg], true);
-        bonhomme.position.y = 1;
         bonhomme.checkCollisions = true;
         bonhomme.ellipsoid = new BABYLON.Vector3(0.5, 1, 0.5);
         bonhomme.ellipsoidOffset = new BABYLON.Vector3(0, 1, 0);
+
+        const savedPos = localStorage.getItem("bonhomme_position");
+        if (savedPos) {
+            const pos = JSON.parse(savedPos);
+            bonhomme.position = new BABYLON.Vector3(pos.x, pos.y, pos.z);
+        } else {
+            bonhomme.position = new BABYLON.Vector3(0, 5, 0);
+        }
 
         const camera = new BABYLON.ArcRotateCamera("arcCam", Math.PI / 2, Math.PI / 2.5, 20, new BABYLON.Vector3(0, 1, 0), scene);
         camera.attachControl(canvas, true);
@@ -99,7 +117,13 @@ window.addEventListener('DOMContentLoaded', function () {
         const inputMap = {};
         scene.actionManager = new BABYLON.ActionManager(scene);
         scene.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnKeyDownTrigger, evt => {
-            inputMap[evt.sourceEvent.key.toLowerCase()] = true;
+            const key = evt.sourceEvent.key.toLowerCase();
+            inputMap[key] = true;
+
+            if (key === "r") {
+                bonhomme.position = new BABYLON.Vector3(0, 5, 0);
+                localStorage.removeItem("bonhomme_position");
+            }
         }));
         scene.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnKeyUpTrigger, evt => {
             inputMap[evt.sourceEvent.key.toLowerCase()] = false;
@@ -109,14 +133,21 @@ window.addEventListener('DOMContentLoaded', function () {
         let isJumping = false;
 
         BABYLON.SceneLoader.ImportMesh("", "models/", "old_rusty_car.glb", scene, function (meshes) {
-            const voiture = meshes[0]; // Le premier mesh du modèle
-            voiture.position = new BABYLON.Vector3(5, 0, 0); // Positionne-le où tu veux
+            const voiture = meshes[0];
+            voiture.position = new BABYLON.Vector3(5, 0, 0);
             voiture.scaling = new BABYLON.Vector3(0.03, 0.03, 0.03);
             voiture.checkCollisions = true;
         });
 
         scene.onBeforeRenderObservable.add(() => {
             if (!bonhomme) return;
+
+            // Sauvegarde auto
+            localStorage.setItem("bonhomme_position", JSON.stringify({
+                x: bonhomme.position.x,
+                y: bonhomme.position.y,
+                z: bonhomme.position.z
+            }));
 
             let baseSpeed = 0.12;
             let sprintSpeed = 0.36;
@@ -197,7 +228,6 @@ window.addEventListener('DOMContentLoaded', function () {
             camera.target = bonhomme.position;
         });
 
-        
         return scene;
     };
 
