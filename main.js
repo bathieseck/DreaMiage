@@ -101,14 +101,16 @@ window.addEventListener('DOMContentLoaded', function () {
         let alpha = camera.alpha;
         let beta = camera.beta;
 
+        let targetAlpha = camera.alpha;
+        let targetBeta = camera.beta;
+
         canvas.addEventListener("mousemove", (e) => {
             if (!document.pointerLockElement) return;
-            alpha -= e.movementX * mouseSensitivity;
-            beta -= e.movementY * verticalSensitivity;
-            beta = BABYLON.Scalar.Clamp(beta, 0.2, Math.PI / 2.2);
-            camera.alpha = alpha;
-            camera.beta = beta;
+            targetAlpha -= e.movementX * mouseSensitivity;
+            targetBeta -= e.movementY * verticalSensitivity;
+            targetBeta = BABYLON.Scalar.Clamp(targetBeta, 0.2, Math.PI / 2.2);
         });
+        
 
         canvas.addEventListener("click", () => {
             canvas.requestPointerLock();
@@ -225,7 +227,14 @@ window.addEventListener('DOMContentLoaded', function () {
                 camera.beta = currentBeta;
             }
 
-            camera.target = bonhomme.position;
+            const cameraTarget = BABYLON.Vector3.Lerp(camera.target, bonhomme.position, 0.1);
+            camera.alpha = BABYLON.Scalar.Lerp(camera.alpha, targetAlpha, 0.1);
+            camera.beta = BABYLON.Scalar.Lerp(camera.beta, targetBeta, 0.1);
+            camera.radius = BABYLON.Scalar.Lerp(camera.radius, 8, 0.1);
+
+
+            camera.target = cameraTarget;
+
         });
 
         return scene;
