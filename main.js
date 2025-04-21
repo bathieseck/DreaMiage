@@ -41,30 +41,32 @@ window.addEventListener('DOMContentLoaded', function () {
         ground.material = groundMaterial;
 
         const platforms = [];
-        const platformPositions = [
-            new BABYLON.Vector3(10, 3, 0),
-            new BABYLON.Vector3(20, 6, -5),
-            new BABYLON.Vector3(30, 9, 5),
-            new BABYLON.Vector3(40, 12, 0),
-            new BABYLON.Vector3(50, 15, -5)
-        ];
+        const platformPositions = [];
+
+        // Génération des 50 plateformes avec un effet tordu horizontalement
+        for (let i = 0; i < 50; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const offsetX = Math.sin(i * 0.5) * 30;  // plus éloigné
+            const offsetZ = Math.cos(i * 0.5) * 30;  // plus éloigné
+            const height = 5 + i * 5;
+            platformPositions.push(new BABYLON.Vector3(offsetX, height, offsetZ));
+        }
 
         platformPositions.forEach((pos, i) => {
             const plat = BABYLON.MeshBuilder.CreateCylinder(`platform${i}`, {
-                diameter: 12, // équivalent à radius * 2
-                height: 1 // épaisseur de la plateforme
+                diameter: 12,
+                height: 0.7
             }, scene);
-            plat.rotation.x = 0; // pas besoin de rotation ici
-            plat.position = new BABYLON.Vector3(pos.x, pos.y - 0.5, pos.z); // ajuste la position pour que le haut soit au bon y
+            plat.rotation.x = 0;
+            plat.position = new BABYLON.Vector3(pos.x, pos.y - 0.5, pos.z);
             plat.checkCollisions = true;
 
             const mat = new BABYLON.StandardMaterial(`platMat${i}`, scene);
-            mat.diffuseColor = new BABYLON.Color3(0.6, 0.8, 1);
+            mat.diffuseColor = new BABYLON.Color3(0.6, 0.8, 1);  // Couleur bleue
             plat.material = mat;
 
             platforms.push(plat);
         });
-
 
         const body = BABYLON.MeshBuilder.CreateCylinder("body", { diameter: 1, height: 2 }, scene);
         body.position.y = 1;
@@ -110,7 +112,6 @@ window.addEventListener('DOMContentLoaded', function () {
             targetBeta -= e.movementY * verticalSensitivity;
             targetBeta = BABYLON.Scalar.Clamp(targetBeta, 0.2, Math.PI / 2.2);
         });
-        
 
         canvas.addEventListener("click", () => {
             canvas.requestPointerLock();
@@ -232,9 +233,7 @@ window.addEventListener('DOMContentLoaded', function () {
             camera.beta = BABYLON.Scalar.Lerp(camera.beta, targetBeta, 0.1);
             camera.radius = BABYLON.Scalar.Lerp(camera.radius, 8, 0.1);
 
-
             camera.target = cameraTarget;
-
         });
 
         return scene;
