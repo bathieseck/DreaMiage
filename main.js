@@ -1,7 +1,17 @@
 window.addEventListener('DOMContentLoaded', function () {
+    const playButton = document.getElementById('playButton');
+    playButton.addEventListener('click', () => {
+        document.getElementById('startScreen').style.display = 'none';
+        launchGame();
+    });
+});
+
+function launchGame() {
+    const loader = document.getElementById('loader');
+    loader.classList.add('visible');
+
     const canvas = document.getElementById('renderCanvas');
     const engine = new BABYLON.Engine(canvas, true);
-
     let bonhomme;
 
     const createScene = function () {
@@ -241,6 +251,14 @@ window.addEventListener('DOMContentLoaded', function () {
 
     const scene = createScene();
 
+    scene.executeWhenReady(() => {
+        // Forcer un temps minimum d'affichage du loader (ex. 2 secondes)
+        setTimeout(() => {
+            loader.classList.remove('visible');
+        }, 2000); // 2000 ms = 2 secondes
+    });
+    
+
     engine.runRenderLoop(() => {
         scene.render();
     });
@@ -248,4 +266,4 @@ window.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('resize', () => {
         engine.resize();
     });
-});
+}
