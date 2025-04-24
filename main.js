@@ -81,8 +81,8 @@ function launchGame() {
         if (platformPositions.length >= 2) {
             const lastPlatformPos = platformPositions[platformPositions.length - 1];
             const beforeLastPlatformPos = platformPositions[platformPositions.length - 2];
-        
-            const direction = lastPlatformPos.subtract(beforeLastPlatformPos).normalize();
+            const rectangleList = [];
+            const rectangleDirection = lastPlatformPos.subtract(beforeLastPlatformPos).normalize();
         
             // Paramètres communs
             const rectangleHeight = 1.2;
@@ -93,7 +93,7 @@ function launchGame() {
         
             for (let i = 1; i <= 4; i++) {
                 const offsetDistance = 15 * i;
-                const pos = lastPlatformPos.add(direction.scale(offsetDistance));
+                const pos = lastPlatformPos.add(rectangleDirection.scale(offsetDistance));
         
                 const rectangle = BABYLON.MeshBuilder.CreateBox(`rectangle${i}`, {
                     width: rectangleWidth,
@@ -118,11 +118,44 @@ function launchGame() {
                     rectangle.position.x = baseX + directionFactor * Math.sin(time * speed) * amplitude;
                     rectangle.refreshBoundingInfo();
                 });
-
+                rectangleList.push(rectangle);
                 solidObjects.push(rectangle);
             }
+
+            // Ajouter un disque en face du dernier rectangle
+            const lastRect = rectangleList[rectangleList.length - 1];
+            const DiskDirection = lastPlatformPos.subtract(beforeLastPlatformPos).normalize(); // Même direction que les rectangles
+            const diskDistance = 20; // Distance supplémentaire à partir du dernier rectangle
+
+            const diskPos = lastRect.position.add(DiskDirection.scale(diskDistance));
+
+            const disk = BABYLON.MeshBuilder.CreateCylinder("finalDisk", {
+                diameter: 14,  // équivalent à radius: 7
+                height: 1.2,   // épaisseur visible
+                tessellation: 64
+            }, scene);
+            disk.position = new BABYLON.Vector3(diskPos.x, lastRect.position.y - 0.5, diskPos.z); // ajusté pour poser dessus
+            disk.checkCollisions = true;
+            
+            const diskMat = new BABYLON.StandardMaterial("diskMat", scene);
+            diskMat.diffuseColor = new BABYLON.Color3(0.3, 1, 0.4);
+            disk.material = diskMat;
+
+            const baseY = disk.position.y;
+            let diskTime = 0;
+            
+            scene.onBeforeRenderObservable.add(() => {
+                diskTime += engine.getDeltaTime();
+            
+                const amplitude = 100;       // monte jusqu’à baseY + 100
+                const speed = 0.001;        // vitesse de montée/descente
+                // Oscillation verticale depuis baseY vers le haut
+                disk.position.y = baseY + (Math.sin(diskTime * speed) * 0.5 + 0.5) * amplitude;
+            
+            });
+            solidObjects.push(disk);
         }
-        
+
         const body = BABYLON.MeshBuilder.CreateCylinder("body", { diameter: 1, height: 2 }, scene);
         body.position.y = 1;
         const head = BABYLON.MeshBuilder.CreateSphere("head", { diameter: 1 }, scene);
