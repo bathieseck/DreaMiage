@@ -50,11 +50,11 @@ function launchGame() {
         groundMaterial.diffuseTexture = texture;
         ground.material = groundMaterial;
 
-        const platforms = [];
+        const solidObjects = [];
         const platformPositions = [];
 
-        // Génération des 50 plateformes avec un effet tordu horizontalement
-        for (let i = 0; i < 50; i++) {
+        // Génération des 10 plateformes avec un effet tordu horizontalement
+        for (let i = 0; i < 10; i++) {
             const angle = Math.random() * Math.PI * 2;
             const offsetX = Math.sin(i * 0.5) * 30;  // plus éloigné
             const offsetZ = Math.cos(i * 0.5) * 30;  // plus éloigné
@@ -75,9 +75,54 @@ function launchGame() {
             mat.diffuseColor = new BABYLON.Color3(0.6, 0.8, 1);  // Couleur bleue
             plat.material = mat;
 
-            platforms.push(plat);
+            solidObjects.push(plat);
         });
 
+        if (platformPositions.length >= 2) {
+            const lastPlatformPos = platformPositions[platformPositions.length - 1];
+            const beforeLastPlatformPos = platformPositions[platformPositions.length - 2];
+        
+            const direction = lastPlatformPos.subtract(beforeLastPlatformPos).normalize();
+        
+            // Paramètres communs
+            const rectangleHeight = 1.2;
+            const rectangleWidth = 10;
+            const rectangleDepth = 5;
+            const amplitude = 5;
+            const speed = 0.002;
+        
+            for (let i = 1; i <= 4; i++) {
+                const offsetDistance = 15 * i;
+                const pos = lastPlatformPos.add(direction.scale(offsetDistance));
+        
+                const rectangle = BABYLON.MeshBuilder.CreateBox(`rectangle${i}`, {
+                    width: rectangleWidth,
+                    height: rectangleHeight,
+                    depth: rectangleDepth
+                }, scene);
+        
+                rectangle.position = new BABYLON.Vector3(lastPlatformPos.x, lastPlatformPos.y, pos.z);
+                rectangle.checkCollisions = true;
+        
+                const mat = new BABYLON.StandardMaterial(`rectangleMat${i}`, scene);
+                mat.diffuseColor = new BABYLON.Color3(1 - (i * 0.2), 0.5, 0.2 + (i * 0.1)); // couleurs variées
+                rectangle.material = mat;
+        
+                const baseX = rectangle.position.x;
+                let time = 0;
+        
+                
+                scene.onBeforeRenderObservable.add(() => {
+                    time += engine.getDeltaTime();
+                    const directionFactor = (i % 2 === 0) ? -1 : 1;
+                    rectangle.position.x = baseX + directionFactor * Math.sin(time * speed) * amplitude;
+                    rectangle.refreshBoundingInfo();
+                });
+
+                solidObjects.push(rectangle);
+            }
+        }
+        
         const body = BABYLON.MeshBuilder.CreateCylinder("body", { diameter: 1, height: 2 }, scene);
         body.position.y = 1;
         const head = BABYLON.MeshBuilder.CreateSphere("head", { diameter: 1 }, scene);
@@ -104,6 +149,8 @@ function launchGame() {
         } else {
             bonhomme.position = new BABYLON.Vector3(0, 5, 0);
         }
+
+        bonhomme.position = new BABYLON.Vector3(platformPositions[platformPositions.length - 1].x, platformPositions[platformPositions.length - 1].y, platformPositions[platformPositions.length - 1].z);
 
         const camera = new BABYLON.ArcRotateCamera("arcCam", Math.PI / 2, Math.PI / 2.5, 20, new BABYLON.Vector3(0, 1, 0), scene);
         camera.attachControl(canvas, true);
@@ -144,13 +191,6 @@ function launchGame() {
 
         let velocityY = 0;
         let isJumping = false;
-
-        BABYLON.SceneLoader.ImportMesh("", "models/", "old_rusty_car.glb", scene, function (meshes) {
-            const voiture = meshes[0];
-            voiture.position = new BABYLON.Vector3(5, 0, 0);
-            voiture.scaling = new BABYLON.Vector3(0.03, 0.03, 0.03);
-            voiture.checkCollisions = true;
-        });
 
         scene.onBeforeRenderObservable.add(() => {
             if (!bonhomme) return;
@@ -202,7 +242,7 @@ function launchGame() {
                 onSomething = true;
             }
 
-            platforms.forEach(plat => {
+            solidObjects.forEach(plat => {
                 const dx = bonhomme.position.x - plat.position.x;
                 const dz = bonhomme.position.z - plat.position.z;
                 const horizontalDist = Math.sqrt(dx * dx + dz * dz);
