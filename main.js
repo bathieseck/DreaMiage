@@ -13,43 +13,9 @@ function launchGame() {
     const canvas = document.getElementById('renderCanvas');
     const engine = new BABYLON.Engine(canvas, true);
     let bonhomme;
-
     const createScene = function () {
         const scene = new BABYLON.Scene(engine);
-        scene.gravity = new BABYLON.Vector3(0, -0.2, 0);
-        scene.collisionsEnabled = true;
-
-        scene.clearColor = new BABYLON.Color4(0.6, 0.4, 0.9, 1);
-
-        const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
-
-        const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, scene);
-        const skyboxMaterial = new BABYLON.StandardMaterial("skyBoxMaterial", scene);
-        skyboxMaterial.backFaceCulling = false;
-        skyboxMaterial.disableLighting = true;
-        skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
-        skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-        skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("https://playground.babylonjs.com/textures/skybox", scene);
-        skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
-        skybox.material = skyboxMaterial;
-        skybox.infiniteDistance = true;
-
-        const ground = BABYLON.MeshBuilder.CreateDisc("ground", {
-            radius: 30,
-            tessellation: 64,
-            sideOrientation: BABYLON.Mesh.DOUBLESIDE
-        }, scene);
-        ground.rotation.x = Math.PI / 2;
-        ground.position.y = 0;
-        ground.checkCollisions = true;
-
-        const groundMaterial = new BABYLON.StandardMaterial("groundMat", scene);
-        const texture = new BABYLON.Texture("https://www.babylonjs-playground.com/textures/grass.png", scene);
-        texture.uScale = 10;
-        texture.vScale = 10;
-        groundMaterial.diffuseTexture = texture;
-        ground.material = groundMaterial;
-
+        addSceneOptions(scene);
         const solidObjects = [];
         const platformPositions = [];
 
@@ -76,6 +42,7 @@ function launchGame() {
             plat.material = mat;
 
             solidObjects.push(plat);
+            createObject(solidObjects, plat, i, scene);
         });
 
         if (platformPositions.length >= 2) {
@@ -83,77 +50,67 @@ function launchGame() {
             const beforeLastPlatformPos = platformPositions[platformPositions.length - 2];
             const rectangleList = [];
             const rectangleDirection = lastPlatformPos.subtract(beforeLastPlatformPos).normalize();
-        
-            // Paramètres communs
-            const rectangleHeight = 1.2;
-            const rectangleWidth = 10;
-            const rectangleDepth = 5;
-            const amplitude = 5;
-            const speed = 0.002;
-        
-            for (let i = 1; i <= 4; i++) {
-                const offsetDistance = 15 * i;
-                const pos = lastPlatformPos.add(rectangleDirection.scale(offsetDistance));
-        
-                const rectangle = BABYLON.MeshBuilder.CreateBox(`rectangle${i}`, {
-                    width: rectangleWidth,
-                    height: rectangleHeight,
-                    depth: rectangleDepth
-                }, scene);
-        
-                rectangle.position = new BABYLON.Vector3(lastPlatformPos.x, lastPlatformPos.y, pos.z);
-                rectangle.checkCollisions = true;
-        
-                const mat = new BABYLON.StandardMaterial(`rectangleMat${i}`, scene);
-                mat.diffuseColor = new BABYLON.Color3(1 - (i * 0.2), 0.5, 0.2 + (i * 0.1)); // couleurs variées
-                rectangle.material = mat;
-        
-                const baseX = rectangle.position.x;
-                let time = 0;
-        
-                
-                scene.onBeforeRenderObservable.add(() => {
-                    time += engine.getDeltaTime();
-                    const directionFactor = (i % 2 === 0) ? -1 : 1;
-                    rectangle.position.x = baseX + directionFactor * Math.sin(time * speed) * amplitude;
-                    rectangle.refreshBoundingInfo();
-                });
-                rectangleList.push(rectangle);
-                solidObjects.push(rectangle);
-            }
 
-            // Ajouter un disque en face du dernier rectangle
+            addRectangles(lastPlatformPos, rectangleDirection, scene, rectangleList, solidObjects, engine);
+
             const lastRect = rectangleList[rectangleList.length - 1];
-            const DiskDirection = lastPlatformPos.subtract(beforeLastPlatformPos).normalize(); // Même direction que les rectangles
-            const diskDistance = 20; // Distance supplémentaire à partir du dernier rectangle
+            const DiskDirection = lastPlatformPos.subtract(beforeLastPlatformPos).normalize(); 
+            const diskDistance = 20; 
 
             const diskPos = lastRect.position.add(DiskDirection.scale(diskDistance));
 
             const disk = BABYLON.MeshBuilder.CreateCylinder("finalDisk", {
-                diameter: 14,  // équivalent à radius: 7
-                height: 1.2,   // épaisseur visible
+                diameter: 14,  
+                height: 1.2,   
                 tessellation: 64
             }, scene);
-            disk.position = new BABYLON.Vector3(diskPos.x, lastRect.position.y - 0.5, diskPos.z); // ajusté pour poser dessus
+            disk.position = new BABYLON.Vector3(diskPos.x, lastRect.position.y - 0.5, diskPos.z); 
             disk.checkCollisions = true;
-            
+
             const diskMat = new BABYLON.StandardMaterial("diskMat", scene);
             diskMat.diffuseColor = new BABYLON.Color3(0.3, 1, 0.4);
             disk.material = diskMat;
 
             const baseY = disk.position.y;
             let diskTime = 0;
-            
+
             scene.onBeforeRenderObservable.add(() => {
                 diskTime += engine.getDeltaTime();
-            
-                const amplitude = 100;       // monte jusqu’à baseY + 100
-                const speed = 0.001;        // vitesse de montée/descente
-                // Oscillation verticale depuis baseY vers le haut
+                const amplitude = 100;       
+                const speed = 0.001;        
                 disk.position.y = baseY + (Math.sin(diskTime * speed) * 0.5 + 0.5) * amplitude;
-            
             });
             solidObjects.push(disk);
+
+            const island2Radius = 20;           
+            const island2Tess = 32;             
+            const maxHeight = baseY + 100; 
+
+            const island2Pos = disk.position.add(DiskDirection.scale(diskDistance));
+            island2Pos.y = maxHeight;
+
+            // Création de la nouvelle île SOLIDE
+            const island2 = BABYLON.MeshBuilder.CreateCylinder("island2", {
+                diameter: island2Radius * 2,
+                height: 1,            
+                tessellation: island2Tess
+            }, scene);
+
+            island2.position = island2Pos.clone();
+            island2.position.y = maxHeight + 0.25;  
+
+            // Activer les collisions
+            island2.checkCollisions = true;
+            island2.ellipsoid = new BABYLON.Vector3(island2Radius, 0.1, island2Radius);  // Ellipsoïde pour les collisions
+            island2.ellipsoidOffset = new BABYLON.Vector3(0, 0.25, 0);  // Décalage pour aligner avec le sol
+
+            // Matériau
+            const island2Mat = new BABYLON.StandardMaterial("island2Mat", scene);
+            island2Mat.diffuseTexture = new BABYLON.Texture("https://www.babylonjs-playground.com/textures/grass.png", scene);
+            island2Mat.diffuseTexture.uScale = island2Mat.diffuseTexture.vScale = 10;
+            island2.material = island2Mat;
+
+            solidObjects.push(island2);
         }
 
         const body = BABYLON.MeshBuilder.CreateCylinder("body", { diameter: 1, height: 2 }, scene);
@@ -185,6 +142,7 @@ function launchGame() {
 
         bonhomme.position = new BABYLON.Vector3(platformPositions[platformPositions.length - 1].x, platformPositions[platformPositions.length - 1].y, platformPositions[platformPositions.length - 1].z);
 
+        bonhomme.checkCollisions = true;
         const camera = new BABYLON.ArcRotateCamera("arcCam", Math.PI / 2, Math.PI / 2.5, 20, new BABYLON.Vector3(0, 1, 0), scene);
         camera.attachControl(canvas, true);
 
@@ -315,8 +273,8 @@ function launchGame() {
             camera.alpha = BABYLON.Scalar.Lerp(camera.alpha, targetAlpha, 0.1);
             camera.beta = BABYLON.Scalar.Lerp(camera.beta, targetBeta, 0.1);
             camera.radius = BABYLON.Scalar.Lerp(camera.radius, 8, 0.1);
-
             camera.target = cameraTarget;
+
         });
 
         return scene;
@@ -330,7 +288,6 @@ function launchGame() {
             loader.classList.remove('visible');
         }, 2000); // 2000 ms = 2 secondes
     });
-    
 
     engine.runRenderLoop(() => {
         scene.render();
@@ -339,4 +296,153 @@ function launchGame() {
     window.addEventListener('resize', () => {
         engine.resize();
     });
+}
+
+function createObject(solidObjects, plat, i, scene) {
+    const obstacleCount = Math.floor(Math.random() * 3);
+    const minDistance = 4;
+    const existingObstacles = [];
+
+    for (let j = 0; j < obstacleCount; j++) {
+        const isSphere = Math.random() < 0.5;
+
+        // Création de l'obstacle (carré ou sphère)
+        const obstacle = isSphere
+            ? BABYLON.MeshBuilder.CreateSphere(`obstacleSphere${i}_${j}`, { diameter: 3 }, scene)
+            : BABYLON.MeshBuilder.CreateBox(`obstacleBox${i}_${j}`, { size: 3 }, scene);
+
+        // Position de départ (au-dessus du centre)
+        obstacle.position = new BABYLON.Vector3(
+            plat.position.x,
+            plat.position.y + 3, // Plus haut
+            plat.position.z
+        );
+
+        obstacle.checkCollisions = true;
+
+        const mat = new BABYLON.StandardMaterial(`obstacleMat${i}_${j}`, scene);
+        mat.diffuseColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+        obstacle.material = mat;
+
+        obstacle.physicsImpostor = new BABYLON.PhysicsImpostor(
+            obstacle,
+            isSphere ? BABYLON.PhysicsImpostor.SphereImpostor : BABYLON.PhysicsImpostor.BoxImpostor,
+            { mass: 1, restitution: 0.1, friction: 0.5 },
+            scene
+        );
+
+        solidObjects.push(obstacle);
+        existingObstacles.push(obstacle);
+
+        // Animation dynamique autour de la plateforme
+        const speed = 0.5 + Math.random() * 0.5; // vitesse légèrement variable
+        const startAngle = Math.random() * Math.PI * 2; // angle de départ aléatoire
+
+        scene.onBeforeRenderObservable.add(() => {
+            const time = performance.now() * 0.001 * speed;
+            const perimeter = 16; // Périmètre du carré (4x4)
+
+            let t = (time + startAngle) * perimeter / (2 * Math.PI);
+
+            // Faire avancer sur les 4 côtés
+            t = t % perimeter;
+            if (t < 4) { // Haut (gauche -> droite)
+                obstacle.position.x = plat.position.x - 2 + t;
+                obstacle.position.z = plat.position.z - 2;
+            } else if (t < 8) { // Droite (haut -> bas)
+                obstacle.position.x = plat.position.x + 2;
+                obstacle.position.z = plat.position.z - 2 + (t - 4);
+            } else if (t < 12) { // Bas (droite -> gauche)
+                obstacle.position.x = plat.position.x + 2 - (t - 8);
+                obstacle.position.z = plat.position.z + 2;
+            } else { // Gauche (bas -> haut)
+                obstacle.position.x = plat.position.x - 2;
+                obstacle.position.z = plat.position.z + 2 - (t - 12);
+            }
+        });
+    }
+}
+
+// Fonction pour vérifier si un obstacle est trop près d'un autre
+function isTooClose(newPos, existingObstacles, minDistance) {
+    for (let obstacle of existingObstacles) {
+        const distance = BABYLON.Vector3.Distance(newPos, obstacle.position);
+        if (distance < minDistance) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function addRectangles(lastPlatformPos, rectangleDirection, scene, rectangleList, solidObjects, engine) {
+    // Paramètres communs
+    const rectangleHeight = 1.2;
+    const rectangleWidth = 10;
+    const rectangleDepth = 5;
+    const amplitude = 5;
+    const speed = 0.002;
+    for (let i = 1; i <= 4; i++) {
+        const offsetDistance = 15 * i;
+        const pos = lastPlatformPos.add(rectangleDirection.scale(offsetDistance));
+
+        const rectangle = BABYLON.MeshBuilder.CreateBox(`rectangle${i}`, {
+            width: rectangleWidth,
+            height: rectangleHeight,
+            depth: rectangleDepth
+        }, scene);
+
+        rectangle.position = new BABYLON.Vector3(lastPlatformPos.x, lastPlatformPos.y, pos.z);
+        rectangle.checkCollisions = true;
+
+        const mat = new BABYLON.StandardMaterial(`rectangleMat${i}`, scene);
+        mat.diffuseColor = new BABYLON.Color3(1 - (i * 0.2), 0.5, 0.2 + (i * 0.1));
+        rectangle.material = mat;
+
+        const baseX = rectangle.position.x;
+        let time = 0;
+
+
+        scene.onBeforeRenderObservable.add(() => {
+            time += engine.getDeltaTime();
+            const directionFactor = (i % 2 === 0) ? -1 : 1;
+            rectangle.position.x = baseX + directionFactor * Math.sin(time * speed) * amplitude;
+            rectangle.refreshBoundingInfo();
+        });
+        rectangleList.push(rectangle);
+        solidObjects.push(rectangle);
+    }
+}
+
+function addSceneOptions(scene){
+    const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+    scene.gravity = new BABYLON.Vector3(0, -0.2, 0);
+    scene.collisionsEnabled = true;
+
+    scene.clearColor = new BABYLON.Color4(0.6, 0.4, 0.9, 1);
+    const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, scene);
+    const skyboxMaterial = new BABYLON.StandardMaterial("skyBoxMaterial", scene);
+    skyboxMaterial.backFaceCulling = false;
+    skyboxMaterial.disableLighting = true;
+    skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+    skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+    skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("https://playground.babylonjs.com/textures/skybox", scene);
+    skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+    skybox.material = skyboxMaterial;
+    skybox.infiniteDistance = true;
+
+    const ground = BABYLON.MeshBuilder.CreateDisc("ground", {
+        radius: 30,
+        tessellation: 64,
+        sideOrientation: BABYLON.Mesh.DOUBLESIDE
+    }, scene);
+    ground.rotation.x = Math.PI / 2;
+    ground.position.y = 0;
+    ground.checkCollisions = true;
+
+    const groundMaterial = new BABYLON.StandardMaterial("groundMat", scene);
+    const texture = new BABYLON.Texture("https://www.babylonjs-playground.com/textures/grass.png", scene);
+    texture.uScale = 10;
+    texture.vScale = 10;
+    groundMaterial.diffuseTexture = texture;
+    ground.material = groundMaterial;
 }
