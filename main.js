@@ -84,7 +84,7 @@ function launchGame() {
 
             // Plateforme finale alignée, plus loin et plus haut que le disk
             const horizontalOffset = 15; // distance en avant du disk
-            const verticalOffset = 4 ;   // plus haut que la position max du disk (il faut sauter)
+            const verticalOffset = 2 ;   // plus haut que la position max du disk (il faut sauter)
 
             const finalPlatformPos = disk.position.add(rectangleDirection.scale(horizontalOffset));
             finalPlatformPos.y = baseY + amplitude + verticalOffset; // au-dessus de la hauteur max du disk
@@ -96,10 +96,15 @@ function launchGame() {
             }, scene);
 
             horizontalPlatform.position = finalPlatformPos;
+            const directionAngle = horizontalPlatform.rotation.y;
+            const forward = new BABYLON.Vector3(Math.sin(directionAngle), 0, Math.cos(directionAngle)).normalize();
+            const right = BABYLON.Vector3.Cross(BABYLON.Axis.Y, forward).normalize();
 
-            // Orientation dans la même direction que les rectangles dynamiques
-            const angleY = Math.atan2(rectangleDirection.x, rectangleDirection.z);
-            horizontalPlatform.rotation.y = Math.PI / 4;;
+            horizontalPlatform.position.addInPlace(forward.scale(25));  // vers l'avant
+            horizontalPlatform.position.addInPlace(right.scale(6));   // vers la gauche (négatif)
+
+            horizontalPlatform.rotation.y = Math.PI / 2;
+
 
             const platform2Mat = new BABYLON.StandardMaterial("platformMat", scene);
             platform2Mat.diffuseColor = new BABYLON.Color3(1, 0.6, 0.2);
@@ -107,8 +112,6 @@ function launchGame() {
 
             horizontalPlatform.checkCollisions = true;
             solidObjects.push(horizontalPlatform);
-
-
 
 
             // Matériau
@@ -148,7 +151,19 @@ function launchGame() {
             bonhomme.position = new BABYLON.Vector3(0, 5, 0);
         }
 
-        bonhomme.position = new BABYLON.Vector3(platformPositions[platformPositions.length - 1].x, platformPositions[platformPositions.length - 1].y, platformPositions[platformPositions.length - 1].z);
+
+        //SPAWN DU BONHOMME A CHANGER
+        // bonhomme.position = new BABYLON.Vector3(platformPositions[platformPositions.length - 1].x, platformPositions[platformPositions.length - 1].y, platformPositions[platformPositions.length - 1].z);
+
+        // Faire apparaître le bonhomme sur la plateforme finale
+        const horizontalPlatformMesh = scene.getMeshByName("horizontalPlatform");
+        if (horizontalPlatformMesh) {
+            bonhomme.position = horizontalPlatformMesh.position.clone();
+            bonhomme.position.y += 1.5;
+        } else {
+            // Position par défaut si la plateforme n'existe pas
+            bonhomme.position = new BABYLON.Vector3(0, 5, 0);
+        }
 
         bonhomme.checkCollisions = true;
         const camera = new BABYLON.ArcRotateCamera("arcCam", Math.PI / 2, Math.PI / 2.5, 20, new BABYLON.Vector3(0, 1, 0), scene);
