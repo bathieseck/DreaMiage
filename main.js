@@ -73,44 +73,52 @@ function launchGame() {
 
             const baseY = disk.position.y;
             let diskTime = 0;
+            const amplitude = 100;
 
             scene.onBeforeRenderObservable.add(() => {
                 diskTime += engine.getDeltaTime();
-                const amplitude = 100;       
                 const speed = 0.001;        
                 disk.position.y = baseY + (Math.sin(diskTime * speed) * 0.5 + 0.5) * amplitude;
             });
             solidObjects.push(disk);
 
-            const island2Radius = 20;           
-            const island2Tess = 32;             
-            const maxHeight = baseY + 100; 
+            // Plateforme finale alignée, plus loin et plus haut que le disk
+            const horizontalOffset = 15; // distance en avant du disk
+            const verticalOffset = 4 ;   // plus haut que la position max du disk (il faut sauter)
 
-            const island2Pos = disk.position.add(DiskDirection.scale(diskDistance));
-            island2Pos.y = maxHeight;
+            const finalPlatformPos = disk.position.add(rectangleDirection.scale(horizontalOffset));
+            finalPlatformPos.y = baseY + amplitude + verticalOffset; // au-dessus de la hauteur max du disk
 
-            // Création de la nouvelle île SOLIDE
-            const island2 = BABYLON.MeshBuilder.CreateCylinder("island2", {
-                diameter: island2Radius * 2,
-                height: 1,            
-                tessellation: island2Tess
+            const horizontalPlatform = BABYLON.MeshBuilder.CreateBox("horizontalPlatform", {
+                width: 40,
+                height: 1.2,
+                depth: 4
             }, scene);
 
-            island2.position = island2Pos.clone();
-            island2.position.y = maxHeight + 0.25;  
+            horizontalPlatform.position = finalPlatformPos;
 
-            // Activer les collisions
-            island2.checkCollisions = true;
-            island2.ellipsoid = new BABYLON.Vector3(island2Radius, 0.1, island2Radius);  // Ellipsoïde pour les collisions
-            island2.ellipsoidOffset = new BABYLON.Vector3(0, 0.25, 0);  // Décalage pour aligner avec le sol
+            // Orientation dans la même direction que les rectangles dynamiques
+            const angleY = Math.atan2(rectangleDirection.x, rectangleDirection.z);
+            horizontalPlatform.rotation.y = Math.PI / 4;;
+
+            const platform2Mat = new BABYLON.StandardMaterial("platformMat", scene);
+            platform2Mat.diffuseColor = new BABYLON.Color3(1, 0.6, 0.2);
+            horizontalPlatform.material = platform2Mat;
+
+            horizontalPlatform.checkCollisions = true;
+            solidObjects.push(horizontalPlatform);
+
+
+
 
             // Matériau
-            const island2Mat = new BABYLON.StandardMaterial("island2Mat", scene);
-            island2Mat.diffuseTexture = new BABYLON.Texture("https://www.babylonjs-playground.com/textures/grass.png", scene);
-            island2Mat.diffuseTexture.uScale = island2Mat.diffuseTexture.vScale = 10;
-            island2.material = island2Mat;
+            const platformMat = new BABYLON.StandardMaterial("platformMat", scene);
+            platformMat.diffuseColor = new BABYLON.Color3(1, 0.6, 0.2); // orange
+            horizontalPlatform.material = platformMat;
 
-            solidObjects.push(island2);
+            horizontalPlatform.checkCollisions = true;
+            solidObjects.push(horizontalPlatform);
+
         }
 
         const body = BABYLON.MeshBuilder.CreateCylinder("body", { diameter: 1, height: 2 }, scene);
@@ -234,22 +242,27 @@ function launchGame() {
             }
 
             solidObjects.forEach(plat => {
-                const dx = bonhomme.position.x - plat.position.x;
-                const dz = bonhomme.position.z - plat.position.z;
-                const horizontalDist = Math.sqrt(dx * dx + dz * dz);
-                const isAbove = bonhomme.position.y > plat.position.y;
+                const boundingBox = plat.getBoundingInfo().boundingBox;
+            
+                const min = boundingBox.minimumWorld;
+                const max = boundingBox.maximumWorld;
+            
+                const isWithinX = bonhomme.position.x >= min.x && bonhomme.position.x <= max.x;
+                const isWithinZ = bonhomme.position.z >= min.z && bonhomme.position.z <= max.z;
+                const isAbove = bonhomme.position.y > max.y - 0.2; // un peu au-dessus
                 const isFalling = velocityY <= 0;
-
-                if (horizontalDist <= 5.5 && isAbove && isFalling) {
-                    const diffY = bonhomme.position.y - plat.position.y;
+            
+                if (isWithinX && isWithinZ && isAbove && isFalling) {
+                    const diffY = bonhomme.position.y - max.y;
                     if (diffY <= 1.1) {
-                        bonhomme.position.y = plat.position.y + 1;
+                        bonhomme.position.y = max.y + 1;
                         velocityY = 0;
                         isJumping = false;
                         onSomething = true;
                     }
                 }
             });
+            
 
             if (onSomething && !isJumping && inputMap[" "]) {
                 velocityY = 0.25;
