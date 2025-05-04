@@ -282,6 +282,26 @@ function launchGame() {
                 camera.beta = currentBeta;
             }
 
+            solidObjects.forEach(obj => {
+                if (!obj.name.startsWith("obstacle")) return;
+            
+                const obstacleBox = obj.getBoundingInfo().boundingBox;
+                const bonhommeBox = bonhomme.getBoundingInfo().boundingBox;
+            
+                const intersects = BABYLON.BoundingBox.Intersects(obstacleBox, bonhommeBox);
+                if (intersects) {
+                    // Calcul de la direction de déplacement de l’obstacle (diff entre frames)
+                    const movementVector = obj.position.subtract(obj._lastPosition || obj.position.clone());
+            
+                    // Appliquer une légère poussée dans cette direction
+                    bonhomme.moveWithCollisions(movementVector.scale(0.6));
+                }
+            
+                // Stocke la position pour comparer au prochain frame
+                obj._lastPosition = obj.position.clone();
+            });
+            
+
             const cameraTarget = BABYLON.Vector3.Lerp(camera.target, bonhomme.position, 0.1);
             camera.alpha = BABYLON.Scalar.Lerp(camera.alpha, targetAlpha, 0.1);
             camera.beta = BABYLON.Scalar.Lerp(camera.beta, targetBeta, 0.1);
@@ -372,6 +392,7 @@ function createObject(solidObjects, plat, i, scene) {
                 obstacle.position.x = plat.position.x - 2;
                 obstacle.position.z = plat.position.z + 2 - (t - 12);
             }
+            obstacle.refreshBoundingInfo();
         });
     }
 }
