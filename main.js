@@ -19,6 +19,10 @@ function launchGame() {
         const solidObjects = [];
         const platformPositions = [];
         let isFreeCamMode = false;
+        let checkpointPosition = new BABYLON.Vector3(0, 5, 0);
+        let checkpointReached = false;
+
+
 
         // Génération des 10 plateformes avec un effet tordu horizontalement
         for (let i = 0; i < 10; i++) {
@@ -28,7 +32,7 @@ function launchGame() {
             const height = 5 + i * 5;
             platformPositions.push(new BABYLON.Vector3(offsetX, height, offsetZ));
         }
-        
+
         platformPositions.forEach((pos, i) => {
             const plat = BABYLON.MeshBuilder.CreateCylinder(`platform${i}`, {
                 diameter: 12,
@@ -98,7 +102,7 @@ function launchGame() {
             finalPlatformPos.y = baseY + amplitude + verticalOffset; // au-dessus de la hauteur max du disk
 
             const horizontalPlatform = BABYLON.MeshBuilder.CreateBox("horizontalPlatform", {
-                width: 40,
+                width: 80,
                 height: 1.2,
                 depth: 4
             }, scene);
@@ -122,7 +126,7 @@ function launchGame() {
             solidObjects.push(horizontalPlatform);
 
             // === Obstacles latéraux traversants à éviter ===
-            const nbObstacles = 4;
+            const nbObstacles = 6;
             const spacing = 5; // écart vertical entre chaque obstacle
             const obstacleDepth = 1;
             const obstacleHeight = 6;
@@ -163,6 +167,39 @@ function launchGame() {
             
                 solidObjects.push(obstacle);
             }
+
+            // === ÎLE FINALE SOLIDE ALIGNÉE AVEC LA PLATEFORME ===
+            const islandDistance = 0; // distance en avant
+            const islandOffsetY = -2;  // légère baisse
+
+            const horizontalForward = new BABYLON.Vector3(Math.sin(horizontalPlatform.rotation.y),0,Math.cos(horizontalPlatform.rotation.y)).normalize();
+            // Direction latérale (vers la droite)
+            const horizontalRight = BABYLON.Vector3.Cross(BABYLON.Axis.Y, horizontalForward).normalize();
+
+
+            const islandPos = horizontalPlatform.position
+            .add(horizontalForward.scale(islandDistance))
+            .add(horizontalRight.scale(-80));
+            islandPos.y += islandOffsetY;
+
+            const finalIsland = BABYLON.MeshBuilder.CreateCylinder("finalIsland", {
+                diameter: 60,
+                height: 1.5,
+                tessellation: 64
+            }, scene);
+            finalIsland.position = islandPos;
+            finalIsland.checkCollisions = true;
+
+            const islandMat = new BABYLON.StandardMaterial("islandMat", scene);
+            const islandTexture = new BABYLON.Texture("https://www.babylonjs-playground.com/textures/grass.png", scene);
+            islandTexture.uScale = 4;
+            islandTexture.vScale = 4;
+            islandMat.diffuseTexture = islandTexture;
+            finalIsland.material = islandMat;
+
+            solidObjects.push(finalIsland);
+
+
             
 
 
@@ -202,9 +239,15 @@ function launchGame() {
         // Faire apparaître le bonhomme sur la plateforme finale
         const horizontalPlatformMesh = scene.getMeshByName("horizontalPlatform");
         if (horizontalPlatformMesh) {
+            // Clone la position de base
             bonhomme.position = horizontalPlatformMesh.position.clone();
             bonhomme.position.y += 1;
-        } else {
+
+            // Décale le bonhomme vers le bord gauche (vers le disk)
+            const backward = new BABYLON.Vector3(Math.cos(horizontalPlatformMesh.rotation.y), 0, -Math.sin(horizontalPlatformMesh.rotation.y));
+            bonhomme.position.addInPlace(backward.scale(horizontalPlatformMesh.scaling.x * 15)); // bord
+        }
+        else {
             // Position par défaut si la plateforme n'existe pas
             bonhomme.position = new BABYLON.Vector3(0, 5, 0);
         }
@@ -389,12 +432,15 @@ function launchGame() {
             if (bonhomme.position.y < -100) {
                 const currentAlpha = camera.alpha;
                 const currentBeta = camera.beta;
-                bonhomme.position = new BABYLON.Vector3(0, 5, 0);
+            
+                bonhomme.position = checkpointPosition.clone();
                 velocityY = 0;
                 isJumping = false;
+            
                 camera.alpha = currentAlpha;
                 camera.beta = currentBeta;
             }
+            
 
             solidObjects.forEach(obj => {
                 if (!obj.name.startsWith("obstacle")) return;
@@ -422,6 +468,32 @@ function launchGame() {
             camera.radius = BABYLON.Scalar.Lerp(camera.radius, 8, 0.1);
             camera.target = cameraTarget;
 
+            const islandMesh = scene.getMeshByName("finalIsland");
+            if (islandMesh && !checkpointReached) {
+                const islandBox = islandMesh.getBoundingInfo().boundingBox;
+                const bonhommeBox = bonhomme.getBoundingInfo().boundingBox;
+
+                if (BABYLON.BoundingBox.Intersects(islandBox, bonhommeBox)) {
+                    checkpointPosition = islandMesh.position.clone();
+                    checkpointPosition.y += 1;
+
+                    checkpointReached = true;
+                    const sound = document.getElementById("checkpointSound");
+                    sound.currentTime = 0;
+                    sound.play();
+
+                    const msg = document.getElementById("checkpointMessage");
+                    msg.style.display = "block";
+
+                    setTimeout(() => {
+                        msg.style.opacity = "0";
+                        setTimeout(() => {
+                            msg.style.display = "none";
+                            msg.style.opacity = "1"; // reset for next use if needed
+                        }, 500);
+                    }, 3000);
+                }
+            }
         });
 
         return scene;
