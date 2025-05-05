@@ -18,6 +18,7 @@ function launchGame() {
         addSceneOptions(scene);
         const solidObjects = [];
         const platformPositions = [];
+        let isFreeCamMode = false;
 
         // Génération des 10 plateformes avec un effet tordu horizontalement
         for (let i = 0; i < 10; i++) {
@@ -105,15 +106,6 @@ function launchGame() {
 
             horizontalPlatform.rotation.y = Math.PI / 2;
 
-
-            const platform2Mat = new BABYLON.StandardMaterial("platformMat", scene);
-            platform2Mat.diffuseColor = new BABYLON.Color3(1, 0.6, 0.2);
-            horizontalPlatform.material = platform2Mat;
-
-            horizontalPlatform.checkCollisions = true;
-            solidObjects.push(horizontalPlatform);
-
-
             // Matériau
             const platformMat = new BABYLON.StandardMaterial("platformMat", scene);
             platformMat.diffuseColor = new BABYLON.Color3(1, 0.6, 0.2); // orange
@@ -121,6 +113,51 @@ function launchGame() {
 
             horizontalPlatform.checkCollisions = true;
             solidObjects.push(horizontalPlatform);
+
+            // === Obstacles latéraux traversants à éviter ===
+            const nbObstacles = 4;
+            const spacing = 5; // écart vertical entre chaque obstacle
+            const obstacleDepth = 1;
+            const obstacleHeight = 6;
+            const obstacleWidth = 1;
+            const platformWidth = 40; // même que horizontalPlatform.width
+            const movementDistance = platformWidth; // ils traversent toute la plateforme
+            const moveSpeed = 0.002;
+
+            for (let i = 0; i < nbObstacles; i++) {
+                const isFromRight = i % 2 === 0;
+                const side = isFromRight ? 1 : -1;
+                const baseX = horizontalPlatform.position.x + (side * platformWidth / 2);
+                const baseY = horizontalPlatform.position.y + obstacleHeight / 2;
+                const baseZ = horizontalPlatform.position.z + (i - nbObstacles / 2) * spacing;
+            
+                const obstacle = BABYLON.MeshBuilder.CreateBox(`obstacleSweeper${i}`, { // ← nom commence par "obstacle"
+                    width: obstacleWidth,
+                    height: obstacleHeight,
+                    depth: obstacleDepth
+                }, scene);
+            
+                obstacle.position = new BABYLON.Vector3(baseX, baseY, baseZ);
+                obstacle.checkCollisions = true;
+            
+                const mat = new BABYLON.StandardMaterial(`sweepObstacleMat${i}`, scene);
+                mat.diffuseColor = new BABYLON.Color3(1, 0, 0);
+                obstacle.material = mat;
+            
+                let time = 0;
+                const direction = -side;
+            
+                scene.onBeforeRenderObservable.add(() => {
+                    time += engine.getDeltaTime();
+                    const t = Math.sin(time * moveSpeed);
+                    obstacle.position.x = baseX + direction * (t + 1) / 2 * movementDistance;
+                    obstacle.refreshBoundingInfo();
+                });
+            
+                solidObjects.push(obstacle);
+            }
+            
+
 
         }
 
@@ -159,7 +196,7 @@ function launchGame() {
         const horizontalPlatformMesh = scene.getMeshByName("horizontalPlatform");
         if (horizontalPlatformMesh) {
             bonhomme.position = horizontalPlatformMesh.position.clone();
-            bonhomme.position.y += 1.5;
+            bonhomme.position.y += 1;
         } else {
             // Position par défaut si la plateforme n'existe pas
             bonhomme.position = new BABYLON.Vector3(0, 5, 0);
@@ -168,6 +205,35 @@ function launchGame() {
         bonhomme.checkCollisions = true;
         const camera = new BABYLON.ArcRotateCamera("arcCam", Math.PI / 2, Math.PI / 2.5, 20, new BABYLON.Vector3(0, 1, 0), scene);
         camera.attachControl(canvas, true);
+        // Caméra par défaut : centrée sur le bonhomme
+        const arcCamera = camera;
+        arcCamera.attachControl(canvas, true);
+
+        const freeCamera = new BABYLON.FreeCamera("freeCam", bonhomme.position.add(new BABYLON.Vector3(0, 10, -10)), scene);
+        freeCamera.setTarget(bonhomme.position);
+        freeCamera.attachControl(canvas, false);
+        freeCamera.speed = 0.5;
+
+        let activeCamera = arcCamera;
+        scene.activeCamera = arcCamera;
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key.toLowerCase() === "v") {
+                if (activeCamera === arcCamera) {
+                    arcCamera.detachControl(canvas);
+                    scene.activeCamera = freeCamera;
+                    freeCamera.attachControl(canvas, true);
+                    activeCamera = freeCamera;
+                    isFreeCamMode = true;
+                } else {
+                    freeCamera.detachControl(canvas);
+                    scene.activeCamera = arcCamera;
+                    arcCamera.attachControl(canvas, true);
+                    activeCamera = arcCamera;
+                    isFreeCamMode = false;
+                }
+            }
+        });
 
         let mouseSensitivity = 0.002;
         let verticalSensitivity = 0.002;
@@ -209,40 +275,66 @@ function launchGame() {
         scene.onBeforeRenderObservable.add(() => {
             if (!bonhomme) return;
 
-            // Sauvegarde auto
             localStorage.setItem("bonhomme_position", JSON.stringify({
                 x: bonhomme.position.x,
                 y: bonhomme.position.y,
                 z: bonhomme.position.z
             }));
 
-            let baseSpeed = 0.12;
-            let sprintSpeed = 0.36;
-            let speed = inputMap["shift"] ? sprintSpeed : baseSpeed;
+            if (!isFreeCamMode) {
+                // mouvement du bonhomme (inchangé)
+                let baseSpeed = 0.12;
+                let sprintSpeed = 0.36;
+                let speed = inputMap["shift"] ? sprintSpeed : baseSpeed;
 
-            let input = new BABYLON.Vector3.Zero();
-            if (inputMap["z"] || inputMap["arrowup"]) input.z += 1;
-            if (inputMap["s"] || inputMap["arrowdown"]) input.z -= 1;
-            if (inputMap["d"] || inputMap["arrowright"]) input.x -= 1;
-            if (inputMap["q"] || inputMap["arrowleft"]) input.x += 1;
+                let input = new BABYLON.Vector3.Zero();
+                if (inputMap["z"] || inputMap["arrowup"]) input.z += 1;
+                if (inputMap["s"] || inputMap["arrowdown"]) input.z -= 1;
+                if (inputMap["d"] || inputMap["arrowright"]) input.x -= 1;
+                if (inputMap["q"] || inputMap["arrowleft"]) input.x += 1;
 
-            if (!input.equals(BABYLON.Vector3.Zero())) {
-                input = input.normalize();
-                const forward = camera.getForwardRay().direction;
-                const right = BABYLON.Vector3.Cross(forward, BABYLON.Axis.Y).normalize();
-                const moveDirection = new BABYLON.Vector3.Zero();
-                moveDirection.addInPlace(forward.scale(input.z));
-                moveDirection.addInPlace(right.scale(input.x));
-                moveDirection.y = 0;
-                moveDirection.normalize();
+                if (!input.equals(BABYLON.Vector3.Zero())) {
+                    input = input.normalize();
+                    const forward = camera.getForwardRay().direction;
+                    const right = BABYLON.Vector3.Cross(forward, BABYLON.Axis.Y).normalize();
+                    const moveDirection = new BABYLON.Vector3.Zero();
+                    moveDirection.addInPlace(forward.scale(input.z));
+                    moveDirection.addInPlace(right.scale(input.x));
+                    moveDirection.y = 0;
+                    moveDirection.normalize();
 
-                bonhomme.moveWithCollisions(moveDirection.scale(speed));
-                bonhomme.rotation.y = Math.atan2(moveDirection.x, moveDirection.z);
+                    bonhomme.moveWithCollisions(moveDirection.scale(speed));
+                    bonhomme.rotation.y = Math.atan2(moveDirection.x, moveDirection.z);
+                } else {
+                    const cameraDirection = camera.getForwardRay().direction.clone();
+                    cameraDirection.y = 0;
+                    cameraDirection.normalize();
+                    bonhomme.rotation.y = Math.atan2(cameraDirection.x, cameraDirection.z);
+                }
             } else {
-                const cameraDirection = camera.getForwardRay().direction.clone();
-                cameraDirection.y = 0;
-                cameraDirection.normalize();
-                bonhomme.rotation.y = Math.atan2(cameraDirection.x, cameraDirection.z);
+                let move = new BABYLON.Vector3.Zero();
+                if (inputMap["z"] || inputMap["arrowup"]) {
+                    move.addInPlace(freeCamera.getDirection(BABYLON.Axis.Z));
+                }
+                if (inputMap["s"] || inputMap["arrowdown"]) {
+                    move.addInPlace(freeCamera.getDirection(BABYLON.Axis.Z).scale(-1));
+                }
+                if (inputMap["d"] || inputMap["arrowright"]) {
+                    move.addInPlace(freeCamera.getDirection(BABYLON.Axis.X));
+                }
+                if (inputMap["q"] || inputMap["arrowleft"]) {
+                    move.addInPlace(freeCamera.getDirection(BABYLON.Axis.X).scale(-1));
+                }
+                if (inputMap[" "]) {
+                    move.addInPlace(BABYLON.Axis.Y);
+                }
+                if (inputMap["shift"]) {
+                    move.addInPlace(BABYLON.Axis.Y.scale(-1));
+                }
+
+                move.normalize();
+                freeCamera.cameraDirection = move.scale(0.5);
+
             }
 
             // Gestion des collisions au sol et sur plateformes
