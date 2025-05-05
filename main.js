@@ -28,7 +28,7 @@ function launchGame() {
             const height = 5 + i * 5;
             platformPositions.push(new BABYLON.Vector3(offsetX, height, offsetZ));
         }
-
+        
         platformPositions.forEach((pos, i) => {
             const plat = BABYLON.MeshBuilder.CreateCylinder(`platform${i}`, {
                 diameter: 12,
@@ -38,8 +38,15 @@ function launchGame() {
             plat.position = new BABYLON.Vector3(pos.x, pos.y - 0.5, pos.z);
             plat.checkCollisions = true;
 
+            // Nouveau matériau avec texture
             const mat = new BABYLON.StandardMaterial(`platMat${i}`, scene);
-            mat.diffuseColor = new BABYLON.Color3(0.6, 0.8, 1);  // Couleur bleue
+
+            // Utilisation d'une texture de gravier en ligne
+            const texture = new BABYLON.Texture("https://www.babylonjs-playground.com/textures/ground.jpg", scene);
+            texture.uScale = 3; // répétition horizontale
+            texture.vScale = 3; // répétition verticale
+
+            mat.diffuseTexture = texture;
             plat.material = mat;
 
             solidObjects.push(plat);
