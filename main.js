@@ -16,6 +16,7 @@ function launchGame() {
     const createScene = function () {
         const scene = new BABYLON.Scene(engine);
         addSceneOptions(scene);
+        addDecorations(scene);
         const solidObjects = [];
         const platformPositions = [];
         let isFreeCamMode = false;
@@ -495,7 +496,6 @@ function launchGame() {
                 }
             }
         });
-
         return scene;
     };
 
@@ -665,4 +665,30 @@ function addSceneOptions(scene){
     texture.vScale = 10;
     groundMaterial.diffuseTexture = texture;
     ground.material = groundMaterial;
+}
+
+function addDecorations(scene, solidObjects) {
+    const islandRadius = 30;
+    const decorationCount = 15;
+    const ringRadius = islandRadius * 0.85; // Un peu à l'intérieur du bord
+
+    for (let i = 0; i < decorationCount; i++) {
+        const angle = (i / decorationCount) * Math.PI * 2; // Répartition régulière en cercle
+        const posX = Math.cos(angle) * ringRadius;
+        const posZ = Math.sin(angle) * ringRadius;
+
+        BABYLON.SceneLoader.ImportMesh(
+            "",
+            "models/",
+            "green_tree.glb",
+            scene,
+            function (meshes) {
+                const rootMesh = meshes[0].clone("tree_" + i); // Clone pour éviter les conflits
+                rootMesh.position = new BABYLON.Vector3(posX, 3.5, posZ);
+                rootMesh.scaling = new BABYLON.Vector3(5, 5, 5);
+                rootMesh.rotation.y = Math.random() * Math.PI * 2;
+                solidObjects.push(rootMesh);
+            }
+        );
+    }
 }
