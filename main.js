@@ -496,6 +496,28 @@ function launchGame() {
                 }
             }
         });
+
+        BABYLON.SceneLoader.ImportMesh(null, "models/", "demon_dragon_full_texture.glb", scene, function (meshes) {
+            const importedMesh = meshes[0];
+        
+            // Crée un pivot invisible au centre
+            const pivot = new BABYLON.TransformNode("modelPivot", scene);
+            pivot.position = new BABYLON.Vector3(0, 0, 0); // centre du monde
+        
+            // Positionne le modèle à une certaine distance du centre
+            importedMesh.parent = pivot;
+            importedMesh.position = new BABYLON.Vector3(40, 1, 0); // rayon de l'orbite
+            importedMesh.scaling = new BABYLON.Vector3(10, 10, 10);
+            importedMesh.checkCollisions = true;
+        
+            // Animation de rotation du pivot
+            scene.onBeforeRenderObservable.add(() => {
+                pivot.rotate(BABYLON.Axis.Y, 0.002, BABYLON.Space.WORLD); // tourne autour de Y
+            });
+        });
+        
+        addSkyPlanet(scene);
+        
         return scene;
     };
 
@@ -691,4 +713,17 @@ function addDecorations(scene, solidObjects) {
             }
         );
     }
+}
+function addSkyPlanet(scene) {
+    BABYLON.SceneLoader.ImportMesh(
+        "",
+        "models/",
+        "planet_earth.glb", // Remplace par le nom réel si différent
+        scene,
+        function (meshes) {
+            const planet = meshes[0];
+            planet.position = new BABYLON.Vector3(0, 100, -200); // Loin et en hauteur
+            planet.scaling = new BABYLON.Vector3(50, 50, 50);    // Grande taille pour bien voir
+        }
+    );
 }
