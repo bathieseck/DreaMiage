@@ -14,6 +14,10 @@ function launchGame() {
     const engine = new BABYLON.Engine(canvas, true);
     let bonhomme;
     const createScene = function () {
+        let mainAnim = null;
+        let wasMoving = false;
+        let lastBonhommePos = null;
+
         const scene = new BABYLON.Scene(engine);
         addSceneOptions(scene);
         addDecorations(scene);
@@ -206,24 +210,12 @@ function launchGame() {
 
         }
 
-        const body = BABYLON.MeshBuilder.CreateCylinder("body", { diameter: 1, height: 2 }, scene);
-        body.position.y = 1;
-        const head = BABYLON.MeshBuilder.CreateSphere("head", { diameter: 1 }, scene);
-        head.position.y = 2.5;
-        const leftArm = BABYLON.MeshBuilder.CreateCylinder("leftArm", { diameter: 0.3, height: 1.5 }, scene);
-        leftArm.rotation.z = Math.PI / 2;
-        leftArm.position = new BABYLON.Vector3(-0.9, 1.5, 0);
-        const rightArm = leftArm.clone("rightArm");
-        rightArm.position.x = 0.9;
-        const leftLeg = BABYLON.MeshBuilder.CreateCylinder("leftLeg", { diameter: 0.4, height: 2 }, scene);
-        leftLeg.position = new BABYLON.Vector3(-0.4, 0, 0);
-        const rightLeg = leftLeg.clone("rightLeg");
-        rightLeg.position.x = 0.4;
-
-        bonhomme = BABYLON.Mesh.MergeMeshes([body, head, leftArm, rightArm, leftLeg, rightLeg], true);
+        // Création d'un proxy invisible pour ton personnage
+        bonhomme = new BABYLON.Mesh("bonhommeProxy", scene);
+        bonhomme.isVisible = false;
         bonhomme.checkCollisions = true;
-        bonhomme.ellipsoid = new BABYLON.Vector3(0.5, 1, 0.5);
-        bonhomme.ellipsoidOffset = new BABYLON.Vector3(0, 1, 0);
+        bonhomme.ellipsoid = new BABYLON.Vector3(1, 2, 1);
+        bonhomme.ellipsoidOffset = new BABYLON.Vector3(0, 2, 0);
 
         const savedPos = localStorage.getItem("bonhomme_position");
         if (savedPos) {
@@ -232,6 +224,43 @@ function launchGame() {
         } else {
             bonhomme.position = new BABYLON.Vector3(0, 5, 0);
         }
+
+        BABYLON.SceneLoader.ImportMesh(
+            null,
+            "models/",
+            "walking_astronaut.glb",
+            scene,
+            function (meshes, particleSystems, skeletons, animationGroups) {
+                if (!meshes || meshes.length === 0) {
+                    console.error("Erreur : modèle non chargé.");
+                    return;
+                }
+        
+                // Créer un container pour gérer l'ensemble
+                const modelContainer = new BABYLON.TransformNode("astronautContainer", scene);
+                modelContainer.parent = bonhomme; // attaché au proxy
+                modelContainer.position = new BABYLON.Vector3(0, -1, 0); // ← à ajuster selon la taille réelle du modèle
+        
+                // On scale ici (ex : divisé par 10)
+                modelContainer.scaling = new BABYLON.Vector3(0.02, 0.02, 0.02); // ajuste selon le modèle
+        
+                // Re-parent tous les sous-meshes
+                meshes.forEach(mesh => {
+                    mesh.parent = modelContainer;
+                });
+        
+                // Animation s'il y en a
+                if (animationGroups && animationGroups.length > 0) {
+                    mainAnim = animationGroups[0];
+                    // On ne démarre pas tout de suite
+                    mainAnim.stop(); 
+                }
+                
+            }
+        );
+
+        
+        
 
 
         //SPAWN DU BONHOMME A CHANGER
@@ -325,6 +354,20 @@ function launchGame() {
 
         scene.onBeforeRenderObservable.add(() => {
             if (!bonhomme) return;
+            
+            const currentPos = bonhomme.position.clone();
+            const isMoving = lastBonhommePos && !bonhomme.position.equalsWithEpsilon(lastBonhommePos, 0.01);
+
+            if (mainAnim) {
+                if (isMoving && !mainAnim.isPlaying) {
+                    mainAnim.start(true);
+                    mainAnim.speedRatio = 10.5;
+                } else if (!isMoving && mainAnim.isPlaying) {
+                    mainAnim.stop();
+                }
+            }
+            lastBonhommePos = currentPos;
+
 
             localStorage.setItem("bonhomme_position", JSON.stringify({
                 x: bonhomme.position.x,
@@ -339,6 +382,17 @@ function launchGame() {
                 let speed = inputMap["shift"] ? sprintSpeed : baseSpeed;
 
                 let input = new BABYLON.Vector3.Zero();
+                const isMoving = !input.equals(BABYLON.Vector3.Zero());
+
+                if (mainAnim) {
+                    if (isMoving && !wasMoving) {
+                        mainAnim.start(true); // relancer en boucle
+                    } else if (!isMoving && wasMoving) {
+                        mainAnim.stop();
+                    }
+                }
+                wasMoving = isMoving;
+
                 if (inputMap["z"] || inputMap["arrowup"]) input.z += 1;
                 if (inputMap["s"] || inputMap["arrowdown"]) input.z -= 1;
                 if (inputMap["d"] || inputMap["arrowright"]) input.x -= 1;
@@ -471,30 +525,31 @@ function launchGame() {
 
             const islandMesh = scene.getMeshByName("finalIsland");
             if (islandMesh && !checkpointReached) {
-                const islandBox = islandMesh.getBoundingInfo().boundingBox;
-                const bonhommeBox = bonhomme.getBoundingInfo().boundingBox;
-
-                if (BABYLON.BoundingBox.Intersects(islandBox, bonhommeBox)) {
+                const distance = BABYLON.Vector3.Distance(bonhomme.position, islandMesh.position);
+            
+                if (distance < 30) {
                     checkpointPosition = islandMesh.position.clone();
                     checkpointPosition.y += 1;
-
+            
                     checkpointReached = true;
+            
                     const sound = document.getElementById("checkpointSound");
                     sound.currentTime = 0;
                     sound.play();
-
+            
                     const msg = document.getElementById("checkpointMessage");
                     msg.style.display = "block";
-
+            
                     setTimeout(() => {
                         msg.style.opacity = "0";
                         setTimeout(() => {
                             msg.style.display = "none";
-                            msg.style.opacity = "1"; // reset for next use if needed
+                            msg.style.opacity = "1";
                         }, 500);
                     }, 3000);
                 }
             }
+            
         });
 
         BABYLON.SceneLoader.ImportMesh(null, "models/", "demon_dragon_full_texture.glb", scene, function (meshes) {
