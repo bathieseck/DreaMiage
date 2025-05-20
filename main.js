@@ -572,6 +572,44 @@ function launchGame() {
         });
         
         addSkyPlanet(scene);
+        const blur = new BABYLON.BlurPostProcess("SandBlur", new BABYLON.Vector2(1.0, 1.0), 2.0, 1, scene.activeCamera);
+        const sandParticles = new BABYLON.ParticleSystem("sand", 3000, scene);
+
+        sandParticles.particleTexture = new BABYLON.Texture("https://www.babylonjs-playground.com/textures/flare.png", scene);
+
+        sandParticles.emitter = new BABYLON.Vector3(0, 10, 0); // au-dessus de la scène
+        sandParticles.minEmitBox = new BABYLON.Vector3(-100, 0, -100); 
+        sandParticles.maxEmitBox = new BABYLON.Vector3(100, 200, 100); //hauteur des particules
+
+        sandParticles.color1 = new BABYLON.Color4(0.95, 0.9, 0.8, 0.15); 
+        sandParticles.color2 = new BABYLON.Color4(0.95, 0.9, 0.8, 0.15); 
+        sandParticles.colorDead = new BABYLON.Color4(0.95, 0.9, 0.8, 0);
+
+
+        sandParticles.minSize = 0.3;
+        sandParticles.maxSize = 1.2;
+
+        sandParticles.minLifeTime = 1;
+        sandParticles.maxLifeTime = 4;
+
+        sandParticles.emitRate = 1000;
+
+        sandParticles.blendMode = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
+
+        sandParticles.gravity = new BABYLON.Vector3(0, -0.2, 0);
+        sandParticles.direction1 = new BABYLON.Vector3(-1, 1, -1);
+        sandParticles.direction2 = new BABYLON.Vector3(1, 1, 1);
+
+        sandParticles.minAngularSpeed = 0;
+        sandParticles.maxAngularSpeed = Math.PI;
+
+        sandParticles.minEmitPower = 0.2;
+        sandParticles.maxEmitPower = 0.4;
+
+        sandParticles.updateSpeed = 0.02;
+
+        sandParticles.start();
+
         
         return scene;
     };
@@ -712,6 +750,9 @@ function addRectangles(lastPlatformPos, rectangleDirection, scene, rectangleList
 
 function addSceneOptions(scene){
     const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+    light.intensity = 1.4; // au lieu de 1
+
+
     scene.gravity = new BABYLON.Vector3(0, -0.2, 0);
     scene.collisionsEnabled = true;
 
@@ -742,6 +783,17 @@ function addSceneOptions(scene){
     texture.vScale = 10;
     groundMaterial.diffuseTexture = texture;
     ground.material = groundMaterial;
+
+    scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+    scene.fogDensity = 0.0015;
+    scene.fogColor = new BABYLON.Color3(0.95, 0.93, 0.88); // beige très clair
+
+
+    const colorGradingTexture = new BABYLON.ColorGradingTexture("https://playground.babylonjs.com/textures/LateSunset.3dl", scene);
+    scene.imageProcessingConfiguration.colorGradingEnabled = true;
+    scene.imageProcessingConfiguration.colorGradingTexture = colorGradingTexture;
+
+
 }
 
 function addDecorations(scene, solidObjects) {
